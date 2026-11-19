@@ -1,0 +1,6 @@
+Flask
+reportlab
+Pillow
+python-docx
+beautifulsoup4
+gunicorn
