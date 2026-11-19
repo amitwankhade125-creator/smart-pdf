@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart PDF AI Maker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:#07172e;color:#f4f8ff;font-family:Arial,sans-serif}
+.container{max-width:1050px;margin:auto}
+h1{text-align:center;margin:8px 0;color:#fff;font-size:32px}
+.sub{text-align:center;color:#b9d8f5;margin:0 0 24px}
+.panel{background:#07539a;border:1px solid #1676bd;border-radius:18px;padding:22px;box-shadow:0 10px 30px #0003}
+label{display:block;font-weight:bold;margin:12px 0 7px}
+input[type=text]{width:100%;padding:13px;border:0;border-radius:8px;font-size:16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.toolbar button,.toolbar label{margin:0}
+button,.file-label{border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer;background:#d9efff;color:#07345c}
+button:hover,.file-label:hover{filter:brightness(1.08)}
+#editor{background:#fff;color:#222;min-height:360px;padding:18px;border-radius:10px;font-size:17px;line-height:1.6;outline:none;overflow-wrap:anywhere}
+#editor img{max-width:100%;height:auto;vertical-align:middle;cursor:pointer}
+#editor img.selected-image{outline:3px solid #10a9e8;outline-offset:2px}
+.tools-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#063e75;padding:12px;border-radius:10px;margin:12px 0}
+.tools-row input[type=range]{width:180px}
+.tools-row .small{font-size:13px;color:#d6eaff}
+.downloads{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.downloads button{padding:15px;font-size:16px;background:#08b6e8;color:#032b4b}
+.downloads button.word{background:#f1f6ff;color:#07345c}
+.note{font-size:13px;color:#d5eaff;margin-top:12px}
+.hidden{display:none}
+@media(max-width:650px){body{padding:12px}.downloads{grid-template-columns:1fr}h1{font-size:25px}#editor{min-height:300px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Smart PDF <span style="color:#17c7ff">AI Maker</span></h1>
+  <p class="sub">Write, insert images, resize them and download PDF or Word</p>
+
+  <div class="panel">
+    <form id="documentForm" method="POST" action="/download">
+      <label for="title">Document Title</label>
+      <input id="title" name="title" type="text" placeholder="Enter document title" value=" ">
+
+      <div class="toolbar">
+        <button type="button" onclick="formatText('bold')"><b>B</b></button>
+        <button type="button" onclick="formatText('italic')"><i>I</i></button>
+        <button type="button" onclick="formatText('underline')"><u>U</u></button>
+        <button type="button" onclick="formatText('insertUnorderedList')">• Bullet List</button>
+        <button type="button" onclick="formatText('insertOrderedList')">1. Number List</button>
+        <label class="file-label" for="imagePicker">＋ Insert Image</label>
+        <input class="hidden" id="imagePicker" type="file" accept="image/*">
+      </div>
+
+      <div class="tools-row">
+        <strong>Selected Image Size:</strong>
+        <input id="imageSize" type="range" min="60" max="700" value="300">
+        <span id="sizeValue" class="small">300 px</span>
+        <button type="button" onclick="alignImage('left')">Left</button>
+        <button type="button" onclick="alignImage('center')">Center</button>
+        <button type="button" onclick="alignImage('right')">Right</button>
+        <span class="small">Image वर क्लिक करा, मग size बदला.</span>
+      </div>
+
+      <label>Editable Document Content</label>
+      <div id="editor" contenteditable="true" spellcheck="true"><p></p></div>
+      <input type="hidden" name="content_html" id="contentHtml">
+
+      <div class="downloads">
+        <button type="submit" name="format" value="pdf">⬇ Download PDF</button>
+        <button type="submit" name="format" value="word" class="word">⬇ Download Word</button>
+      </div>
+    </form>
+    <p class="note">PDF मध्ये मजकूर 9 pt ठेवला आहे. Word फाइल डाउनलोड केल्यानंतर Word मध्ये मजकूर आणि Image edit करू शकता.</p>
+  </div>
+</div>
+
+<script>
+const editor = document.getElementById('editor');
+const picker = document.getElementById('imagePicker');
+const sizeSlider = document.getElementById('imageSize');
+const sizeValue = document.getElementById('sizeValue');
+let savedRange = null;
+let selectedImage = null;
+
+function saveSelection(){
+  const sel = window.getSelection();
+  if(sel && sel.rangeCount && editor.contains(sel.anchorNode)){
+    savedRange = sel.getRangeAt(0).cloneRange();
+  }
+}
+editor.addEventListener('keyup', saveSelection);
+editor.addEventListener('mouseup', saveSelection);
+editor.addEventListener('focus', saveSelection);
+document.addEventListener('selectionchange', saveSelection);
+
+function formatText(command){
+  editor.focus();
+  document.execCommand(command, false, null);
+  saveSelection();
+}
+
+picker.addEventListener('change', function(){
+  const file = this.files && this.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('कृपया image file निवडा.'); return; }
+  if(file.size > 10 * 1024 * 1024){ alert('Image 10 MB पेक्षा लहान निवडा.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    editor.focus();
+    const sel = window.getSelection();
+    if(savedRange){
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+    const img = document.createElement('img');
+    img.src = e.target.result;
+    img.style.width = '300px';
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.display = 'inline-block';
+    img.alt = file.name;
+
+    const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+    if(range && editor.contains(range.startContainer)){
+      range.deleteContents();
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }else{
+      editor.appendChild(img);
+    }
+    selectImage(img);
+    saveSelection();
+  };
+  reader.readAsDataURL(file);
+  this.value = '';
+});
+
+function selectImage(img){
+  if(selectedImage) selectedImage.classList.remove('selected-image');
+  selectedImage = img;
+  selectedImage.classList.add('selected-image');
+  const width = parseInt(img.style.width, 10) || 300;
+  sizeSlider.value = Math.min(700, Math.max(60, width));
+  sizeValue.textContent = width + ' px';
+}
+editor.addEventListener('click', function(e){
+  if(e.target && e.target.tagName === 'IMG'){
+    selectImage(e.target);
+  }else if(selectedImage){
+    selectedImage.classList.remove('selected-image');
+    selectedImage = null;
+  }
+});
+sizeSlider.addEventListener('input', function(){
+  if(!selectedImage) return;
+  selectedImage.style.width = this.value + 'px';
+  selectedImage.style.height = 'auto';
+  selectedImage.style.maxWidth = '100%';
+  sizeValue.textContent = this.value + ' px';
+});
+function alignImage(side){
+  if(!selectedImage){ alert('आधी Image वर क्लिक करा.'); return; }
+  selectedImage.style.display = 'block';
+  selectedImage.style.marginLeft = side === 'right' || side === 'center' ? 'auto' : '0';
+  selectedImage.style.marginRight = side === 'left' || side === 'center' ? 'auto' : '0';
+}
+
+document.getElementById('documentForm').addEventListener('submit', function(e){
+  // Remove editor-only selection outline before sending content.
+  if(selectedImage) selectedImage.classList.remove('selected-image');
+  document.getElementById('contentHtml').value = editor.innerHTML;
+});
+</script>
+</body>
+</html>
